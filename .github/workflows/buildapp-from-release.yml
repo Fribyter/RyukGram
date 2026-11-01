@@ -185,7 +185,24 @@ jobs:
                 Instagram_URL: ${{ inputs.decrypted_instagram_url }}
               run: |
                 set -euo pipefail
-                wget "$Instagram_URL" --no-verbose -O packages/com.burbn.instagram.ipa
+                # 使用独立虚拟环境，避免系统 pip 安装限制
+                python3 -m venv "$RUNNER_TEMP/ryukgram-download"
+                "$RUNNER_TEMP/ryukgram-download/bin/python" -m pip install --upgrade gdown
+                
+                mkdir -p packages
+                
+                "$RUNNER_TEMP/ryukgram-download/bin/gdown" \
+                  "$Instagram_URL" \
+                  -O packages/com.burbn.instagram.ipa
+                
+                # 下载后立即检查，失败就停止
+                ls -lh packages/com.burbn.instagram.ipa
+                file packages/com.burbn.instagram.ipa
+                
+                if ! unzip -tq packages/com.burbn.instagram.ipa; then
+                  echo "::error::下载结果不是有效 IPA/ZIP，请检查下载链接、权限或原文件。"
+                  exit 1
+                fi
 
                 # The IPA is user-supplied, so its version can differ from the deb's.
                 PLIST="$(unzip -Z1 packages/com.burbn.instagram.ipa 'Payload/*.app/Info.plist' 2>/dev/null | awk -F/ 'NF==3' | head -1 || true)"
